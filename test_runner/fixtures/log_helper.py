@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 import logging
 import logging.config
+
 """
 This file configures logging to use in python tests.
 Logs are automatically captured and shown in their
@@ -22,20 +25,16 @@ https://docs.pytest.org/en/6.2.x/logging.html
 LOGGING = {
     "version": 1,
     "loggers": {
-        "root": {
-            "level": "INFO"
-        },
-        "root.safekeeper_async": {
-            "level": "INFO"  # a lot of logs on DEBUG level
-        }
-    }
+        "root": {"level": "INFO"},
+        "root.safekeeper_async": {"level": "INFO"},  # a lot of logs on DEBUG level
+    },
 }
 
 
-def getLogger(name='root') -> logging.Logger:
+def getLogger(name: str = "root") -> logging.Logger:
     """Method to get logger for tests.
 
-    Should be used to get correctly initialized logger. """
+    Should be used to get correctly initialized logger."""
     return logging.getLogger(name)
 
 

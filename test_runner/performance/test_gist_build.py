@@ -1,9 +1,8 @@
-import os
+from __future__ import annotations
+
 from contextlib import closing
-from fixtures.benchmark_fixture import MetricReport
-from fixtures.zenith_fixtures import ZenithEnv
-from fixtures.compare_fixtures import PgCompare, VanillaCompare, ZenithCompare
-from fixtures.log_helper import log
+
+from fixtures.compare_fixtures import PgCompare
 
 
 #
@@ -11,12 +10,11 @@ from fixtures.log_helper import log
 # As of this writing, we're duplicate those giant WAL records for each page,
 # which makes the delta layer about 32x larger than it needs to be.
 #
-def test_gist_buffering_build(zenith_with_baseline: PgCompare):
-    env = zenith_with_baseline
+def test_gist_buffering_build(neon_with_baseline: PgCompare):
+    env = neon_with_baseline
 
     with closing(env.pg.connect()) as conn:
         with conn.cursor() as cur:
-
             # Create test table.
             cur.execute("create table gist_point_tbl(id int4, p point)")
             cur.execute(
@@ -24,8 +22,8 @@ def test_gist_buffering_build(zenith_with_baseline: PgCompare):
             )
 
             # Build the index.
-            with env.record_pageserver_writes('pageserver_writes'):
-                with env.record_duration('build'):
+            with env.record_pageserver_writes("pageserver_writes"):
+                with env.record_duration("build"):
                     cur.execute(
                         "create index gist_pointidx2 on gist_point_tbl using gist(p) with (buffering = on)"
                     )

@@ -1,0 +1,118 @@
+name: 'Pin build-tools image'
+
+on:
+  workflow_dispatch:
+    inputs:
+      from-tag:
+        description: 'Source tag'
+        required: true
+        type: string
+      force:
+        description: 'Force the image to be pinned'
+        default: false
+        type: boolean
+  workflow_call:
+    inputs:
+      from-tag:
+        description: 'Source tag'
+        required: true
+        type: string
+      force:
+        description: 'Force the image to be pinned'
+        default: false
+        type: boolean
+
+defaults:
+  run:
+    shell: bash -euo pipefail {0}
+
+concurrency:
+  group: pin-build-tools-image-${{ inputs.from-tag }}
+  cancel-in-progress: false
+
+# No permission for GITHUB_TOKEN by default; the **minimal required** set of permissions should be granted in each job.
+permissions: {}
+
+env:
+  FROM_TAG: ${{ inputs.from-tag }}
+  TO_TAG: pinned
+
+jobs:
+  check-manifests:
+    runs-on: ubuntu-22.04
+    outputs:
+      skip: ${{ steps.check-manifests.outputs.skip }}
+
+    steps:
+      - name: Check if we really need to pin the image
+        id: check-manifests
+        run: |
+          docker manifest inspect neondatabase/build-tools:${FROM_TAG} > ${FROM_TAG}.json
+          docker manifest inspect neondatabase/build-tools:${TO_TAG}   > ${TO_TAG}.json
+
+          if diff ${FROM_TAG}.json ${TO_TAG}.json; then
+            skip=true
+          else
+            skip=false
+          fi
+
+          echo "skip=${skip}" | tee -a $GITHUB_OUTPUT
+
+  tag-image:
+    needs: check-manifests
+
+    # use format(..) to catch both inputs.force = true AND inputs.force = 'true'
+    if: needs.check-manifests.outputs.skip == 'false' || format('{0}', inputs.force) == 'true'
+
+    runs-on: ubuntu-22.04
+
+    permissions:
+      id-token: write # for `azure/login` and aws auth
+
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.NEON_DOCKERHUB_USERNAME }}
+          password: ${{ secrets.NEON_DOCKERHUB_PASSWORD }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: eu-central-1
+          role-to-assume: ${{ vars.DEV_AWS_OIDC_ROLE_ARN }}
+          role-duration-seconds: 3600
+
+      - name: Login to Amazon Dev ECR
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Azure login
+        uses: azure/login@6c251865b4e6290e7b78be643ea2d005bc51f69a  # @v2.1.1
+        with:
+          client-id: ${{ secrets.AZURE_DEV_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_DEV_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        run: |
+          az acr login --name=neoneastus2
+
+      - name: Tag build-tools with `${{ env.TO_TAG }}` in Docker Hub, ECR, and ACR
+        env:
+          DEFAULT_DEBIAN_VERSION: bookworm
+        run: |
+          for debian_version in bullseye bookworm; do
+            tags=()
+
+            tags+=("-t" "neondatabase/build-tools:${TO_TAG}-${debian_version}")
+            tags+=("-t" "369495373322.dkr.ecr.eu-central-1.amazonaws.com/build-tools:${TO_TAG}-${debian_version}")
+            tags+=("-t" "neoneastus2.azurecr.io/neondatabase/build-tools:${TO_TAG}-${debian_version}")
+
+            if [ "${debian_version}" == "${DEFAULT_DEBIAN_VERSION}" ]; then
+              tags+=("-t" "neondatabase/build-tools:${TO_TAG}")
+              tags+=("-t" "369495373322.dkr.ecr.eu-central-1.amazonaws.com/build-tools:${TO_TAG}")
+              tags+=("-t" "neoneastus2.azurecr.io/neondatabase/build-tools:${TO_TAG}")
+            fi
+
+            docker buildx imagetools create "${tags[@]}" \
+                                              neondatabase/build-tools:${FROM_TAG}-${debian_version}
+          done

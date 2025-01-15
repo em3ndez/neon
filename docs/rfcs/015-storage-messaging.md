@@ -2,7 +2,7 @@
 
 Created on 19.01.22
 
-Initially created [here](https://github.com/zenithdb/rfcs/pull/16) by @kelvich.
+Initially created [here](https://github.com/neondatabase/rfcs/pull/16) by @kelvich.
 
 That it is an alternative to (014-safekeeper-gossip)[]
 
@@ -124,7 +124,7 @@ Each storage node can subscribe to the relevant sets of keys and maintain a loca
 
 ### Safekeeper address discovery
 
-During the startup safekeeper should publish the address he is listening on as the part of `{"sk_#{sk_id}" => ip_address}`. Then the pageserver can resolve `sk_#{sk_id}` to the actual address. This way it would work both locally and in the cloud setup. Safekeeper should have `--advertised-address` CLI option so that we can listen on e.g. 0.0.0.0 but advertize something more useful.
+During the startup safekeeper should publish the address he is listening on as the part of `{"sk_#{sk_id}" => ip_address}`. Then the pageserver can resolve `sk_#{sk_id}` to the actual address. This way it would work both locally and in the cloud setup. Safekeeper should have `--advertised-address` CLI option so that we can listen on e.g. 0.0.0.0 but advertise something more useful.
 
 ### Safekeeper behavior
 
@@ -195,7 +195,7 @@ sequenceDiagram
     PS1->>SK1: start replication
 ```
 
-#### Behavour of services during typical operations
+#### Behaviour of services during typical operations
 
 ```mermaid
 sequenceDiagram
@@ -250,7 +250,7 @@ sequenceDiagram
     PS2->>M: Register downloaded timeline
     PS2->>M: Get safekeepers for timeline, subscribe to changes
     PS2->>SK1: Start replication to catch up
-    note over O: PS2 catched up, time to switch compute
+    note over O: PS2 caught up, time to switch compute
     O->>C: Restart compute with new pageserver url in config
     note over C: Wal push is restarted
     loop request pages
@@ -292,4 +292,4 @@ But with an etcd we are in a bit different situation:
 1. We don't need persistency and strong consistency guarantees for the data we store in the etcd
 2. etcd uses Grpc as a protocol, and messages are pretty simple
 
-So it looks like implementing in-mem store with etcd interface is straightforward thing _if we will want that in future_. At the same time, we can avoid implementing it right now, and we will be able to run local zenith installation with etcd running somewhere in the background (as opposed to building and running console, which in turn requires Postgres).
+So it looks like implementing in-mem store with etcd interface is straightforward thing _if we will want that in future_. At the same time, we can avoid implementing it right now, and we will be able to run local neon installation with etcd running somewhere in the background (as opposed to building and running console, which in turn requires Postgres).
